@@ -11,12 +11,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-    # - ./nome-do-projeto:/var/www/html
+      - ./nome-do-backend:/var/www/html
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
       - ./docker/php/xdebug/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
       - ./docker/php/xdebug/error_reporting.ini:/usr/local/etc/php/conf.d/error_reporting.ini
     networks:
-      - container-network
+      - php-server-network
   nginx:
     container_name: server-nginx
     build:
@@ -28,7 +28,7 @@ services:
       - '8080:80'
       - '443:443'
     volumes:
-    # - ./nome-do-projeto:/var/www/html
+      - ./nome-do-projeto-backend:/var/www/html
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
     networks:
       - php-server-network
@@ -52,6 +52,23 @@ services:
       MYSQL_USER: user
       MYSQL_PASSWORD: password
 
+  redis:
+    image: redis:alpine
+    container_name: server-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-server-data:/data
+    command: redis-server --appendonly yes
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1GB
+    networks:
+      - php-server-network
+
   phpmyadmin:
     container_name: server-phpmyadmin
     image: phpmyadmin:5.2
@@ -65,10 +82,26 @@ services:
     depends_on:
       - mysql
 
+  vue:
+    container_name: vue-app
+    build:
+      context: ./nome-do-projeto-front
+      dockerfile: ../docker/vue/Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./nome-do-projeto-front:/app
+      - /app/node_modules
+    networks:
+      - php-server-network
+    command: ["npm", "run", "dev", "--", "--host"]
+
 networks:
   php-server-network:
     driver: bridge
 
 volumes:
   php-server-data:
+    driver: local
+  redis-server-data:
     driver: local
